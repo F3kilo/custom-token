@@ -7,45 +7,55 @@ use ic_cdk::{init, query, update};
 use serde::Deserialize;
 
 thread_local! {
-    static BALANCES: RefCell<Storage> = RefCell::new(Storage::default());
+    static BALANCES: RefCell<HashMap<Principal, Nat>> = RefCell::new(HashMap::default());
     static OWNER: RefCell<Principal> = RefCell::new(Principal::anonymous());
 }
 
-fn check_owner(user: Principal) -> Result<(), TokenError> {
-    if user != OWNER.with(|storage| *storage.borrow()) {
-        return Err(TokenError::NotAuthorized);
-    }
-    Ok(())
-}
-
-#[derive(Debug, Default)]
-struct Storage(HashMap<Principal, Nat>);
+#[derive(Default)]
+struct Storage {}
 
 impl Storage {
-    pub fn balances(&mut self) -> Balances<&mut Self> {
-        Balances::new(self)
+    pub fn set_owner(&mut self, user: Principal) {
+        OWNER.with(|storage| *storage.borrow_mut() = user);
+    }
+
+    pub fn get_owner(&self) -> Principal {
+        OWNER.with(|storage| *storage.borrow())
+    }
+
+    pub fn check_owner(&self, user: Principal) -> Result<(), TokenError> {
+        if user != self.get_owner() {
+            return Err(TokenError::NotAuthorized);
+        }
+        Ok(())
     }
 }
 
-impl BalancesStorage for &mut Storage {
+impl BalancesStorage for Storage {
     fn balance_of(&self, user: Principal) -> Nat {
-        self.0.get(&user).cloned().unwrap_or_default()
+        BALANCES.with(|map| map.borrow().get(&user).cloned().unwrap_or_default())
     }
 
     fn credit(&mut self, to: Principal, amount: Nat) {
-        *self.0.entry(to).or_default() += amount;
+        BALANCES.with(|map| {
+            let mut map = map.borrow_mut();
+            *map.entry(to).or_default() += amount;
+        });
     }
 
     fn debit(&mut self, from: Principal, amount: Nat) -> Option<Nat> {
-        let balance = self.0.get_mut(&from)?;
+        BALANCES.with(|map| {
+            let mut map = map.borrow_mut();
+            let balance = map.entry(from).or_default();
 
-        if *balance < amount {
-            return None;
-        }
+            if *balance < amount {
+                return None;
+            }
 
-        *balance -= amount.clone();
+            *balance -= amount;
 
-        Some(amount)
+            Some(balance.clone())
+        })
     }
 }
 
@@ -58,40 +68,34 @@ pub enum TokenError {
 #[init]
 #[candid_method(init)]
 fn init(init_balance: Nat) {
-    let owner = ic_cdk::caller();
-    OWNER.with(|storage| *storage.borrow_mut() = owner);
+    let mut storage = Storage::default();
 
-    BALANCES.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        let mut balances = storage.balances();
-        balances.mint(owner, init_balance);
-    })
+    let owner = ic_cdk::caller();
+    storage.set_owner(owner);
+
+    Balances::new(storage).mint(owner, init_balance);
 }
 
 #[update]
 #[candid_method(update)]
 fn mint(to: Principal, amount: Nat) -> Result<Nat, TokenError> {
-    check_owner(ic_cdk::caller())?;
+    let storage = Storage::default();
+    storage.check_owner(ic_cdk::caller())?;
 
-    let amount = BALANCES.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        let mut balances = storage.balances();
-        balances.mint(to, amount)
-    });
-    Ok(amount)
+    let minted = Balances::new(storage).mint(to, amount);
+    Ok(minted)
 }
 
 #[update]
 #[candid_method(update)]
 fn transfer(to: Principal, amount: Nat) -> Result<Nat, TokenError> {
-    let from = ic_cdk::caller();
-    let mb_amount = BALANCES.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        let mut balances = storage.balances();
-        balances.transfer(from, to, amount)
-    });
+    let storage = Storage::default();
+    let mut balances = Balances::new(storage);
 
+    let from = ic_cdk::caller();
+    let mb_amount = balances.transfer(from, to, amount);
     let amount = mb_amount.ok_or(TokenError::InsufficientBalance)?;
+
     Ok(amount)
 }
 
@@ -100,11 +104,7 @@ fn transfer(to: Principal, amount: Nat) -> Result<Nat, TokenError> {
 fn balance_of(user: Option<Principal>) -> Nat {
     let user = user.unwrap_or(ic_cdk::caller());
 
-    BALANCES.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        let balances = storage.balances();
-        balances.balance_of(user)
-    })
+    Balances::new(Storage::default()).balance_of(user)
 }
 
 candid::export_service!();
