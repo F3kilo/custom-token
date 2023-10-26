@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use candid::{candid_method, CandidType, Nat, Principal};
+use candid::{CandidType, Nat, Principal};
 use custom_token::{Balances, BalancesStorage};
 use ic_cdk::{init, query, update};
 use serde::Deserialize;
@@ -66,7 +66,6 @@ pub enum TokenError {
 }
 
 #[init]
-#[candid_method(init)]
 fn init(init_balance: Nat) {
     let mut storage = Storage::default();
 
@@ -77,7 +76,6 @@ fn init(init_balance: Nat) {
 }
 
 #[update]
-#[candid_method(update)]
 fn mint(to: Principal, amount: Nat) -> Result<Nat, TokenError> {
     let storage = Storage::default();
     storage.check_owner(ic_cdk::caller())?;
@@ -87,7 +85,6 @@ fn mint(to: Principal, amount: Nat) -> Result<Nat, TokenError> {
 }
 
 #[update]
-#[candid_method(update)]
 fn transfer(to: Principal, amount: Nat) -> Result<Nat, TokenError> {
     let storage = Storage::default();
     let mut balances = Balances::new(storage);
@@ -100,7 +97,6 @@ fn transfer(to: Principal, amount: Nat) -> Result<Nat, TokenError> {
 }
 
 #[query]
-#[candid_method(query)]
 fn balance_of(user: Option<Principal>) -> Nat {
     let user = user.unwrap_or(ic_cdk::caller());
 
