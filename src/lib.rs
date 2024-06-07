@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 thread_local! {
     static BALANCES: RefCell<HashMap<Principal, Nat>> = RefCell::new(HashMap::default());
-    static OWNER: RefCell<Principal> = RefCell::new(Principal::anonymous());
+    static OWNER: RefCell<Principal> = const { RefCell::new(Principal::anonymous()) };
 }
 
 #[derive(Default)]
