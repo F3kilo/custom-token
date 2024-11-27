@@ -8,6 +8,7 @@ use crate::balance::{Balances, BalancesStorage};
 thread_local! {
     static BALANCES: RefCell<HashMap<Principal, Nat>> = RefCell::new(HashMap::default());
     static OWNER: RefCell<Principal> = const { RefCell::new(Principal::anonymous()) };
+    static FEE_AMOUNT: Nat = Nat::from(1_u32);
 }
 
 #[derive(Default)]
@@ -52,6 +53,14 @@ impl BalancesStorage for Storage {
 
             Some(balance.clone())
         })
+    }
+
+    fn fee_amount(&self) -> Nat {
+        FEE_AMOUNT.with(|amount| amount.clone())
+    }
+
+    fn fee_recipient(&self) -> Principal {
+        self.get_owner()
     }
 }
 
