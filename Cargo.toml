@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-candid = "0.10.8"
-ic-cdk = "0.14.0"
-ic-cdk-macros = "0.14.0"
+candid = "0.10"
+ic-cdk = "0.17"
+ic-cdk-macros = "0.17"
 serde = "1.0"
 
 [lib]
